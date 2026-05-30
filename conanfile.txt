@@ -1,6 +1,8 @@
 [requires]
 spdlog/1.15.3
 raylib/5.5
+bullet3/3.25
+gtest/1.17.0
 
 [generators]
 CMakeDeps
