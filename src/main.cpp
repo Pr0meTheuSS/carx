@@ -60,7 +60,7 @@ void DrawTrails() {
     }
 }
 // =========================
-// TERRAIN BUILD (NO HEIGHTFIELD BUGS)
+// TERRAIN BUILD
 // =========================
 void CreateTerrain(btDynamicsWorld* world) {
     heightData.resize(TERRAIN_SIZE * TERRAIN_SIZE);
@@ -118,7 +118,11 @@ void InitPhysics() {
     btRigidBody::btRigidBodyConstructionInfo ci(mass, ms, chassisShape, inertia);
     chassisBody = new btRigidBody(ci);
     chassisBody->setActivationState(DISABLE_DEACTIVATION);
+    btTransform comOffset;
+    comOffset.setIdentity();
+    comOffset.setOrigin(btVector3(0, -0.8f, 0));
 
+    chassisBody->setCenterOfMassTransform(chassisBody->getWorldTransform() * comOffset);
     world->addRigidBody(chassisBody);
 
     // --- vehicle tuning (СТАБИЛЬНОСТЬ) ---
@@ -138,20 +142,17 @@ void InitPhysics() {
 
     for (int i = 0; i < 4; i++) {
         vehicle->addWheel(points[i], btVector3(0, -1, 0), btVector3(-1, 0, 0), 0.6f,
-                          0.7f,  // <- чуть увеличено (СТАБИЛЬНЫЙ контакт)
+                          0.7f,
                           tuning, i < 2);
     }
     for (int i = 0; i < 4; i++) {
         auto& w = vehicle->getWheelInfo(i);
 
         if (i < 2) {
-            // передние колёса — контроль
-            w.m_frictionSlip = 3.5f;
-            w.m_rollInfluence = 0.1f;
+            w.m_frictionSlip = 4.5f;
+            w.m_rollInfluence = 0.05f;  // перед
         } else {
-            // задние — дрифт
-            w.m_frictionSlip = 1.6f;
-            w.m_rollInfluence = 0.6f;
+            w.m_rollInfluence = 0.1f;  // зад
         }
     }
 }
@@ -170,8 +171,13 @@ void UpdateInput() {
     if (IsKeyDown(KEY_A)) steer = 0.4f;
     if (IsKeyDown(KEY_D)) steer = -0.4f;
 
-    vehicle->setSteeringValue(steer, 0);
-    vehicle->setSteeringValue(steer, 1);
+    btVector3 vel = chassisBody->getLinearVelocity();
+    float speed = vel.length();
+
+    // float maxSteer = 0.4f * (1.0f - (speed / 30.0f, 0.0f, 0.7f));
+
+    vehicle->setSteeringValue(steer /* * maxSteer*/, 0);
+    vehicle->setSteeringValue(steer /* * maxSteer*/, 1);
 
     vehicle->applyEngineForce(engine, 2);
     vehicle->applyEngineForce(engine, 3);
@@ -238,11 +244,13 @@ void DrawWheel(const Vector3& pos, const btMatrix3x3& basis) {
     DrawCylinderWires({0, 0, 0}, 0.5f, 0.5f, 0.3f, 16, BLACK);
 
     rlPopMatrix();
-}  
+}
 // =========================
 // RENDER TERRAIN
 // =========================
 void DrawTerrain() {
+    //     auto pts = Spline2D::generateSpline2D(input, 150.0);
+
     for (int x = 0; x < TERRAIN_SIZE - 1; x++)
         for (int z = 0; z < TERRAIN_SIZE - 1; z++) {
             float h = SampleHeight(x, z);
@@ -327,6 +335,20 @@ int main() {
         for (int i = 0; i < vehicle->getNumWheels(); i++) {
             vehicle->updateWheelTransform(i, true);
 
+            auto& wl = vehicle->getWheelInfo(0);
+            auto& wr = vehicle->getWheelInfo(1);
+
+            float travelL = wl.m_raycastInfo.m_suspensionLength;
+            float travelR = wr.m_raycastInfo.m_suspensionLength;
+
+            float antiRoll = (travelL - travelR) * 8000.0f;
+
+            if (wl.m_raycastInfo.m_isInContact)
+                chassisBody->applyForce(btVector3(0, -antiRoll, 0), wl.m_raycastInfo.m_contactPointWS - chassisBody->getCenterOfMassPosition());
+
+            if (wr.m_raycastInfo.m_isInContact)
+                chassisBody->applyForce(btVector3(0, antiRoll, 0), wr.m_raycastInfo.m_contactPointWS - chassisBody->getCenterOfMassPosition());
+
             auto tr = vehicle->getWheelInfo(i).m_worldTransform;
             btVector3 p = tr.getOrigin();
 
@@ -353,3 +375,46 @@ int main() {
     CloseWindow();
     return 0;
 }
+
+// #include <raylib.h>
+
+// #include <vector>
+
+// #include "utilities/spline2d_generator.h"
+
+// int main() {
+//     const int W = 1200;
+//     const int H = 800;
+
+//     InitWindow(W, H, "Spline2D debug");
+
+//     std::vector<Spline2D::Corner> input = {
+//         Spline2D::Corner(2, Spline2D::Direction::RIGHT),
+//         Spline2D::Corner(2, Spline2D::Direction::RIGHT),
+//         Spline2D::Corner(2, Spline2D::Direction::RIGHT),
+//         Spline2D::Corner(2, Spline2D::Direction::LEFT),
+//     };
+
+//     auto pts = Spline2D::generateSpline2D(input, 150.0);
+
+//     SetTargetFPS(60);
+
+//     while (!WindowShouldClose()) {
+//         BeginDrawing();
+//         ClearBackground(BLACK);
+
+//         // оси
+//         DrawLine(W / 2, 0, W / 2, H, DARKGRAY);
+//         DrawLine(0, H / 2, W, H / 2, DARKGRAY);
+
+//         for (size_t i = 1; i < pts.size(); i++) {
+//             DrawLine(W / 2 + pts[i - 1].x, H / 2 + pts[i - 1].y, W / 2 + pts[i].x, H / 2 + pts[i].y, GREEN);
+
+//             DrawCircle(W / 2 + pts[i].x, H / 2 + pts[i].y, 4, RED);
+//         }
+
+//         EndDrawing();
+//     }
+
+//     CloseWindow();
+// }

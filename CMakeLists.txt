@@ -12,13 +12,16 @@ find_package(PkgConfig REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(raylib REQUIRED)
 find_package(GTest REQUIRED)
+# find_package(SDL2 REQUIRED)
+
+# find_package(bgfx REQUIRED)
 
 # Рекурсивно находим все .cpp файлы в src/
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog raylib Bullet::Bullet gtest::gtest)
+target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog raylib Bullet::Bullet gtest::gtest SDL2) # bgfx::bgfx)
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
