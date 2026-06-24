@@ -5,9 +5,7 @@ project(carx VERSION 0.0.1)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(${CMAKE_BINARY_DIR}/conan_toolchain.cmake)
-
-find_package(Bullet REQUIRED)
+find_package(Bullet CONFIG REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(raylib REQUIRED)
